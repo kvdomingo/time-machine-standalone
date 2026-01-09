@@ -14,12 +14,9 @@ import { getRouteApi } from "@tanstack/react-router";
 import moment, { type Moment } from "moment";
 import pluralize from "pluralize";
 import { useMemo, useRef, useState } from "react";
-import type {
-  CheckInResponse,
-  PaginatedResponse,
-  TextLogResponse,
-} from "@/api/types/checkIn.ts";
+import type { PaginatedResponse, TextLogResponse } from "@/api/types/checkIn.ts";
 import Stats from "@/components/checkin/Stats.tsx";
+import type { Checkin } from "@/db-collections";
 import type { ViewOption } from "@/types/dateRangeViewOption.ts";
 import { DEFAULT_DATE_FORMAT } from "@/utils/constants.ts";
 import CheckInList from "./CheckInList";
@@ -53,7 +50,7 @@ const VIEW_OPTIONS: ViewOption[] = [
 ];
 
 interface CheckInViewProps {
-  checkIns: PaginatedResponse<CheckInResponse[]>;
+  checkIns: PaginatedResponse<Checkin[]>;
   textLog: TextLogResponse;
 }
 
@@ -74,7 +71,7 @@ function CheckInView({ checkIns, textLog }: CheckInViewProps) {
     setOpenPeriodSelectMenu(false);
 
     await navigate({
-      to: "./",
+      to: "/",
       search: {
         ...search,
         start_date:
@@ -97,7 +94,7 @@ function CheckInView({ checkIns, textLog }: CheckInViewProps) {
     setCustomRangeStart(start);
 
     await navigate({
-      to: "./",
+      to: "/",
       search: {
         ...search,
         start_date: start.format(DEFAULT_DATE_FORMAT),
@@ -113,7 +110,7 @@ function CheckInView({ checkIns, textLog }: CheckInViewProps) {
     setCustomRangeEnd(end);
 
     await navigate({
-      to: "./",
+      to: "/",
       search: {
         ...search,
         end_date: end.format(DEFAULT_DATE_FORMAT),

@@ -1,12 +1,13 @@
 import { Container, Grid, Typography } from "@mui/material";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { eq, gte, lte, min, or, sum, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import dateFormat from "dateformat";
 import moment from "moment";
-import api, { BaseQueryKey } from "@/api";
-import { tagCacheQueryOptions } from "@/api/queryOptions.ts";
+import { useMemo } from "react";
+import type { PaginatedResponse, TextLogResponse } from "@/api/types/checkIn";
 import CheckInView from "@/components/checkin";
 import PendingComponent from "@/components/shared/PendingComponent.tsx";
+import { type Checkin, checkinsCollection } from "@/db-collections";
 import type { CheckinSearchParams } from "@/types/router.ts";
 import { DEFAULT_DATE_FORMAT } from "@/utils/constants.ts";
 
@@ -20,54 +21,57 @@ export const Route = createFileRoute("/")({
 
     return { start_date, end_date, page, tag: search.tag };
   },
-  loaderDeps: ({ search }) => search,
-  loader: ({ deps: { page, start_date, end_date, tag }, context: { queryClient } }) => {
-    return Promise.all([
-      queryClient.ensureQueryData({
-        queryFn: () => api.checkin.list(page, start_date, end_date, tag),
-        queryKey: [BaseQueryKey.CHECKIN, page, start_date, end_date, tag],
-        initialData: {
-          data: {
-            count: 0,
-            next: null,
-            previous: null,
-            results: [],
-          },
-        },
-      }),
-      queryClient.ensureQueryData({
-        queryFn: () => api.checkin.log(start_date, end_date),
-        queryKey: [BaseQueryKey.TEXT_LOG, start_date, end_date],
-        initialData: {
-          data: { "": [] },
-        },
-      }),
-      queryClient.ensureQueryData(tagCacheQueryOptions),
-      queryClient.ensureQueryData({
-        queryFn: () => api.checkin.getStats(start_date, end_date),
-        queryKey: [BaseQueryKey.CHECKIN, "stats", start_date, end_date],
-        initialData: { data: [] },
-      }),
-    ]);
-  },
 });
 
 function Index() {
   const { start_date, end_date, page, tag } = Route.useSearch();
 
-  const {
-    data: { data: checkins },
-  } = useSuspenseQuery({
-    queryFn: () => api.checkin.list(page, start_date, end_date, tag),
-    queryKey: [BaseQueryKey.CHECKIN, page, start_date, end_date, tag],
-  });
+  const checkInsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ c: checkinsCollection })
+        .where(({ c }) => gte(c.record_date, start_date))
+        .where(({ c }) => lte(c.record_date, end_date))
+        .where(({ c }) => or(eq(c.tag, tag), eq(c.tag, "")))
+        .orderBy(({ c }) => c.start_time, "desc")
+        .limit(10)
+        .offset((page - 1) * 10),
+    [start_date, end_date, page, tag],
+  );
+  const checkIns: PaginatedResponse<Checkin[]> = {
+    count: checkInsQuery.data.length,
+    results: checkInsQuery.data,
+  };
 
-  const {
-    data: { data: textLog },
-  } = useSuspenseQuery({
-    queryFn: () => api.checkin.log(start_date, end_date),
-    queryKey: [BaseQueryKey.TEXT_LOG, start_date, end_date],
-  });
+  const textLogQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ c: checkinsCollection })
+        .select(({ c }) => ({
+          record_date: c.record_date,
+          tag: c.tag,
+          duration: sum(c.duration),
+          activities: c.activities,
+          start_time: min(c.start_time),
+        }))
+        .where(({ c }) => gte(c.record_date, start_date))
+        .where(({ c }) => lte(c.record_date, end_date))
+        .groupBy(({ c }) => [c.record_date, c.tag, c.activities])
+        .orderBy(({ c }) => [c.record_date, c.start_time]),
+    [start_date, end_date],
+  );
+  const textLog = useMemo(() => {
+    const out: TextLogResponse = {};
+    for (const t of textLogQuery.data) {
+      out[t.record_date] ??= [];
+      out[t.record_date].push({
+        tag: t.tag,
+        duration: t.duration,
+        activities: t.activities.split(",").map((a) => a.trim()),
+      });
+    }
+    return out;
+  }, [textLogQuery.data]);
 
   return (
     <Grid container spacing={1} my={5} px={4}>
@@ -80,7 +84,7 @@ function Index() {
           </Grid>
         </Grid>
 
-        <CheckInView checkIns={checkins} textLog={textLog} />
+        <CheckInView checkIns={checkIns} textLog={textLog} />
       </Container>
     </Grid>
   );

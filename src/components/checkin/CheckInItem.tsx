@@ -1,17 +1,15 @@
 import { Delete, Edit } from "@mui/icons-material";
 import { Grid, IconButton, ListItem, Typography } from "@mui/material";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import moment from "moment/moment";
 import pluralize from "pluralize";
 import { useState } from "react";
-import api, { BaseQueryKey } from "@/api";
-import type { CheckInResponse } from "@/api/types/checkIn.ts";
+import { type Checkin, checkinsCollection } from "@/db-collections";
 import { DEFAULT_TIME_FORMAT } from "@/utils/constants.ts";
 import CheckInAddEdit from "./CheckInAddEdit";
 
 interface CheckInItemProps {
-  checkIn: CheckInResponse;
+  checkIn: Checkin;
 }
 
 const Route = getRouteApi("/");
@@ -20,27 +18,15 @@ function CheckInItem({ checkIn }: CheckInItemProps) {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
 
-  const queryClient = useQueryClient();
-
-  const deleteCheckIn = useMutation({
-    mutationFn: (id: string) => api.checkin.delete(id),
-    mutationKey: [BaseQueryKey.CHECKIN, "delete"],
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.CHECKIN] });
-      void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.TEXT_LOG] });
-      void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.TAG_CACHE] });
-    },
-  });
-
   const [isEditing, setIsEditing] = useState(false);
 
-  async function handleDeleteCheckIn(id: string) {
-    await deleteCheckIn.mutateAsync(id);
+  function handleDeleteCheckIn(id: string) {
+    checkinsCollection.delete(id);
   }
 
   async function handleSelectTag(tag: string) {
     await navigate({
-      to: "./",
+      to: "/",
       search: { ...search, tag: tag === search.tag ? undefined : tag },
     });
   }

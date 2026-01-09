@@ -1,11 +1,11 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { gte, lte, sum, useLiveQuery } from "@tanstack/react-db";
 import { getRouteApi } from "@tanstack/react-router";
 import type { Data } from "plotly.js";
 import { useMemo, useState } from "react";
 import Plot from "react-plotly.js";
-import api, { BaseQueryKey } from "@/api";
 import type { CheckinStatsItem } from "@/api/types/checkIn.ts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { checkinsCollection } from "@/db-collections";
 
 type ChartType = "pie" | "bar";
 
@@ -47,12 +47,20 @@ function TabContent({ checkIns, data }: TabContentProps) {
 function Stats() {
   const { start_date, end_date } = Route.useSearch();
 
-  const {
-    data: { data: stats },
-  } = useSuspenseQuery({
-    queryFn: () => api.checkin.getStats(start_date, end_date),
-    queryKey: [BaseQueryKey.CHECKIN, "stats", start_date, end_date],
-  });
+  const { data: stats } = useLiveQuery(
+    (q) =>
+      q
+        .from({ c: checkinsCollection })
+        .select(({ c }) => ({
+          tag: c.tag,
+          duration: sum(c.duration),
+        }))
+        .where(({ c }) => gte(c.record_date, start_date))
+        .where(({ c }) => lte(c.record_date, end_date))
+        .groupBy(({ c }) => c.tag)
+        .orderBy(({ c }) => c.duration),
+    [start_date, end_date],
+  );
 
   const [chartSelector, setChartSelector] = useState<ChartType>("pie");
 

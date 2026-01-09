@@ -1,12 +1,11 @@
 import { Add, Check, Close } from "@mui/icons-material";
 import { Autocomplete, Button, Grid, IconButton, TextField } from "@mui/material";
 import { DatePicker, TimePicker } from "@mui/x-date-pickers";
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import moment from "moment";
 import { useState } from "react";
-import api, { BaseQueryKey } from "@/api";
-import { tagCacheQueryOptions } from "@/api/queryOptions.ts";
-import type { CheckInForm, CheckInResponse } from "@/api/types/checkIn.ts";
+import type { CheckInForm } from "@/api/types/checkIn.ts";
+import { type Checkin, checkinsCollection } from "@/db-collections";
+import { useTagCache } from "@/hooks/use-tag-cache";
 import { DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT } from "@/utils/constants.ts";
 
 enum CheckInStatus {
@@ -22,14 +21,14 @@ type CheckInAddEditProps =
   | {
       isEditing: true;
       stopEditing: () => void;
-      editingProps: CheckInResponse;
+      editingProps: Checkin;
     };
 
 function CheckInAddEdit(props: CheckInAddEditProps) {
   const initialCheckIn: CheckInForm = {
     duration: props.isEditing ? props.editingProps.duration : 0,
     start_time: props.isEditing
-      ? props.editingProps.start_time
+      ? props.editingProps.start_time.toISOString()
       : moment().format(DEFAULT_TIME_FORMAT),
     record_date: props.isEditing
       ? props.editingProps.record_date
@@ -46,28 +45,7 @@ function CheckInAddEdit(props: CheckInAddEditProps) {
     activities: CheckInStatus.OK,
   };
 
-  const queryClient = useQueryClient();
-
-  const {
-    data: { data: tagCache },
-  } = useSuspenseQuery(tagCacheQueryOptions);
-
-  function invalidateAll() {
-    void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.CHECKIN] });
-    void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.TEXT_LOG] });
-    void queryClient.invalidateQueries({ queryKey: [BaseQueryKey.TAG_CACHE] });
-  }
-
-  const createCheckIn = useMutation({
-    mutationFn: (data: CheckInForm) => api.checkin.create(data),
-    mutationKey: [BaseQueryKey.CHECKIN, "create"],
-  });
-
-  const updateCheckIn = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CheckInForm }) =>
-      api.checkin.update(id, data),
-    mutationKey: [BaseQueryKey.CHECKIN, "update"],
-  });
+  const tagCache = useTagCache();
 
   const [endTime, setEndTime] = useState(
     props.isEditing
@@ -190,13 +168,22 @@ function CheckInAddEdit(props: CheckInAddEditProps) {
     const errors = validateForm();
     if (Object.values(errors).some(Boolean)) return;
 
-    await createCheckIn.mutateAsync(newCheckInData, {
-      onSuccess: () => {
-        invalidateAll();
-        setIsCreating(false);
-        setNewCheckInData({ ...initialCheckIn });
-      },
+    const now = new Date();
+    const tx = checkinsCollection.insert({
+      ...newCheckInData,
+      start_time: new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        parseInt(newCheckInData.start_time.split(":")[0], 10),
+        parseInt(newCheckInData.start_time.split(":")[1], 10),
+      ).toISOString(),
     });
+    await tx.isPersisted.promise;
+
+    setIsCreating(false);
+    setNewCheckInData({ ...initialCheckIn });
   }
 
   async function handleEditCheckIn(e: any) {
@@ -206,15 +193,24 @@ function CheckInAddEdit(props: CheckInAddEditProps) {
       const errors = validateForm();
       if (Object.values(errors).some(Boolean)) return;
 
-      await updateCheckIn.mutateAsync(
-        { id: props.editingProps.id, data: newCheckInData },
-        {
-          onSuccess: () => {
-            invalidateAll();
-            props.stopEditing();
-          },
-        },
-      );
+      const now = new Date();
+      const tx = checkinsCollection.update(props.editingProps.id, (draft) => {
+        draft.duration = newCheckInData.duration;
+        draft.start_time = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          now.getHours(),
+          parseInt(newCheckInData.start_time.split(":")[0], 10),
+          parseInt(newCheckInData.start_time.split(":")[1], 10),
+        ).toISOString();
+        draft.record_date = newCheckInData.record_date;
+        draft.tag = newCheckInData.tag;
+        draft.activities = newCheckInData.activities;
+      });
+      await tx.isPersisted.promise;
+
+      props.stopEditing();
     }
   }
 

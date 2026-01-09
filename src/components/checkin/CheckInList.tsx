@@ -1,11 +1,12 @@
 import { Grid, List, ListItem, Pagination } from "@mui/material";
 import { getRouteApi } from "@tanstack/react-router";
-import type { CheckInResponse, PaginatedResponse } from "@/api/types/checkIn.ts";
+import type { PaginatedResponse } from "@/api/types/checkIn.ts";
+import type { Checkin } from "@/db-collections";
 import CheckInAddEdit from "./CheckInAddEdit";
 import CheckInItem from "./CheckInItem";
 
 interface CheckInListProps {
-  data: PaginatedResponse<CheckInResponse[]>;
+  data: PaginatedResponse<Checkin[]>;
 }
 
 const Route = getRouteApi("/");
@@ -15,7 +16,7 @@ function CheckInList({ data }: CheckInListProps) {
   const search = Route.useSearch();
 
   async function handlePageChange(page: number) {
-    await navigate({ to: "./", search: { ...search, page } });
+    await navigate({ to: "/", search: { ...search, page } });
   }
 
   return (
