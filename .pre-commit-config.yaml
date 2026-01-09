@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.3.11
+    hooks:
+      - id: biome-check
+        args: ["--unsafe"]
+        additional_dependencies: ["@biomejs/biome@2.3.11"]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        args: ["--verbose"]

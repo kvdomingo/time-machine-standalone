@@ -1,0 +1,22 @@
+{
+  "projectName": "time-machine",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "bun",
+  "addOnOptions": {},
+  "git": true,
+  "version": 1,
+  "framework": "react-cra",
+  "chosenAddOns": [
+    "biome",
+    "nitro",
+    "start",
+    "compiler",
+    "db",
+    "shadcn",
+    "t3env",
+    "table",
+    "tanstack-query"
+  ]
+}
