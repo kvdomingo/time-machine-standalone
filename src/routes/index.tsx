@@ -1,5 +1,5 @@
 import { Container, Grid, Typography } from "@mui/material";
-import { eq, gte, lte, min, or, sum, useLiveQuery } from "@tanstack/react-db";
+import { eq, gte, lte, min, sum, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import dateFormat from "dateformat";
 import moment from "moment";
@@ -32,7 +32,7 @@ function Index() {
         .from({ c: checkinsCollection })
         .where(({ c }) => gte(c.record_date, start_date))
         .where(({ c }) => lte(c.record_date, end_date))
-        .where(({ c }) => or(eq(c.tag, tag), eq(c.tag, "")))
+        .where(({ c }) => eq(c.tag, tag ?? ""))
         .orderBy(({ c }) => c.start_time, "desc")
         .limit(10)
         .offset((page - 1) * 10),
@@ -42,6 +42,7 @@ function Index() {
     count: checkInsQuery.data.length,
     results: checkInsQuery.data,
   };
+  console.dir(checkInsQuery, { depth: null });
 
   const textLogQuery = useLiveQuery(
     (q) =>

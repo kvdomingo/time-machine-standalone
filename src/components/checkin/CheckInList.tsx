@@ -39,7 +39,7 @@ function CheckInList({ data }: CheckInListProps) {
         <ListItem>
           <CheckInAddEdit />
         </ListItem>
-        {data.results.length > 0 ? (
+        {data.count > 0 ? (
           data.results.map((c) => <CheckInItem checkIn={c} key={c.id} />)
         ) : (
           <ListItem sx={{ color: "text.secondary" }}>
